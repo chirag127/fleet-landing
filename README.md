@@ -1,5 +1,7 @@
 # api-fleet-landing
 
+[![GitHub stars](https://img.shields.io/github/stars/chirag127/api-fleet-landing?style=social)](https://github.com/chirag127/api-fleet-landing/stargazers)
+
 Static landing page for the [oriz API fleet](https://api.oriz.in) — 5 free, static JSON APIs for reference data (RTO codes, physics constants, Indian classical ragas, Indian dynasties, Countries+).
 
 Deployed to **https://api.oriz.in** via Cloudflare Pages.
