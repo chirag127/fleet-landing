@@ -1,5 +1,7 @@
 # build output
 dist/
+# PWA dev-mode service worker output
+dev-dist/
 # generated types
 .astro/
 

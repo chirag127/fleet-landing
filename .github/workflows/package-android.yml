@@ -1,0 +1,58 @@
+name: package-android
+
+# Wraps the hosted PWA (https://fleet-landing.oriz.in) as an Android TWA via Bubblewrap and
+# attaches UNSIGNED .apk/.aab artifacts to the prerelease. Signing is a deliberate BLOCKER:
+# no keystore/cert is generated or committed here. To ship to Play, add a keystore secret and
+# a signing step downstream. Best-effort: runs on prerelease publish, never blocks the release.
+
+on:
+  release:
+    types: [prereleased]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  twa:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Install Bubblewrap
+        run: npm i -g @bubblewrap/cli
+
+      - name: Init TWA from hosted manifest
+        run: |
+          bubblewrap init \
+            --manifest https://fleet-landing.oriz.in/manifest.webmanifest \
+            --directory twa --skipPwaValidation || echo "init needs manual confirmation in CI"
+
+      - name: Build unsigned APK + AAB
+        working-directory: twa
+        continue-on-error: true
+        run: |
+          chmod +x ./gradlew || true
+          ./gradlew assembleRelease bundleRelease || echo "gradle build requires a keystore for signing (BLOCKER)"
+
+      - name: Collect unsigned artifacts
+        id: collect
+        run: |
+          mkdir -p out
+          find twa -name '*-unsigned.apk' -o -name '*.aab' 2>/dev/null | while read -r f; do cp "$f" out/ || true; done
+          ls -la out || true
+          echo "count=$(ls out 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
+
+      - name: Attach to prerelease
+        if: ${{ steps.collect.outputs.count != '0' }}
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: out/*

@@ -1,0 +1,45 @@
+name: prerelease
+
+on:
+  push:
+    branches: [main]
+
+concurrency:
+  group: prerelease-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  prerelease:
+    # Guard against recursion when this workflow's own tag push arrives.
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm build
+
+      - name: Compute deterministic tag
+        id: tag
+        run: echo "tag=prerelease-$(date -u +%Y%m%d)-$(echo ${{ github.sha }} | cut -c1-7)" >> "$GITHUB_OUTPUT"
+
+      - name: Package dist tarball
+        run: tar -czf fleet-landing-${{ steps.tag.outputs.tag }}.tar.gz -C dist .
+
+      - name: Publish prerelease
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          prerelease: true
+          files: fleet-landing-${{ steps.tag.outputs.tag }}.tar.gz

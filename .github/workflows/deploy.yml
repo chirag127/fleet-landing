@@ -1,36 +1,33 @@
-name: Deploy to GitHub Pages
+name: deploy
 
 on:
   push:
     branches: [main]
-  workflow_dispatch:
+  workflow_dispatch: {}
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
 
-      - name: Install deps
-        run: npm ci
+      - run: pnpm install --frozen-lockfile
 
-      - name: Build
+      - run: pnpm build
         env:
           ORIZ_FLEET_GOOGLE_ANALYTICS_MEASUREMENT_ID: ${{ secrets.ORIZ_FLEET_GOOGLE_ANALYTICS_MEASUREMENT_ID }}
           ORIZ_FLEET_MICROSOFT_CLARITY_PROJECT_ID: ${{ secrets.ORIZ_FLEET_MICROSOFT_CLARITY_PROJECT_ID }}
@@ -38,23 +35,10 @@ jobs:
           ORIZ_FLEET_POSTHOG_API_HOST: ${{ secrets.ORIZ_FLEET_POSTHOG_API_HOST }}
           ORIZ_FLEET_SENTRY_DSN_BROWSER_SDK: ${{ secrets.ORIZ_FLEET_SENTRY_DSN_BROWSER_SDK }}
           ORIZ_FLEET_CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ secrets.ORIZ_FLEET_CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
-        run: npm run build
 
-      - name: Write CNAME
-        run: echo "api.oriz.in" > dist/CNAME
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v4
         with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy
-        id: deployment
-        uses: actions/deploy-pages@v4
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=fleet-landing

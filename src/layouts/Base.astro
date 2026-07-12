@@ -1,6 +1,6 @@
 ---
 import '../styles/global.css';
-import { getInjectedScripts, getContentSecurityPolicy } from '@oriz/web-script-injectors';
+import { getInjectedScripts, getContentSecurityPolicy } from '../lib/web-script-injectors';
 
 interface Props {
   title: string;
@@ -23,10 +23,12 @@ const csp = getContentSecurityPolicy(env);
     <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/pwa-192.png" />
     <meta property="og:type" content="website" />
     <meta property="og:title" content={title} />
     <meta property="og:description" content={description} />
-    <meta property="og:url" content="https://api.oriz.in/" />
+    <meta property="og:url" content="https://fleet-landing.oriz.in/" />
     <meta name="twitter:card" content="summary" />
     <title>{title}</title>
     <Fragment set:html={injectedHead} />
@@ -34,5 +36,12 @@ const csp = getContentSecurityPolicy(env);
   <body class="bg-white text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100 antialiased min-h-screen">
     <slot />
     <Fragment set:html={injectedBodyEnd} />
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>

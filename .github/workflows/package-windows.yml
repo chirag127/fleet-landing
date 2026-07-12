@@ -1,0 +1,74 @@
+name: package-windows
+
+# Wraps the hosted PWA (https://fleet-landing.oriz.in) as a Windows desktop app via Tauri v2
+# and attaches UNSIGNED NSIS (.exe) + MSI installers to the prerelease. Signing is a deliberate
+# BLOCKER: no code-signing cert is generated or committed. Best-effort: never blocks the release.
+
+on:
+  release:
+    types: [prereleased]
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  tauri:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Tauri CLI
+        run: npm i -g @tauri-apps/cli
+
+      - name: Scaffold Tauri wrapper for the hosted URL
+        shell: bash
+        continue-on-error: true
+        run: |
+          mkdir -p src-tauri/icons
+          cat > src-tauri/tauri.conf.json <<'JSON'
+          {
+            "$schema": "https://schema.tauri.app/config/2",
+            "productName": "oriz API fleet",
+            "version": "0.0.1",
+            "identifier": "in.oriz.fleet-landing",
+            "build": { "frontendDist": "https://fleet-landing.oriz.in" },
+            "app": {
+              "windows": [{ "title": "oriz API fleet", "width": 1280, "height": 800 }]
+            },
+            "bundle": {
+              "active": true,
+              "targets": ["nsis", "msi"],
+              "icon": ["icons/icon.ico"]
+            }
+          }
+          JSON
+
+      - name: Fetch app icon
+        shell: bash
+        continue-on-error: true
+        run: curl -fsSL https://fleet-landing.oriz.in/favicon.ico -o src-tauri/icons/icon.ico || true
+
+      - name: Build unsigned NSIS + MSI
+        continue-on-error: true
+        run: tauri build --config src-tauri/tauri.conf.json
+
+      - name: Collect installers
+        id: collect
+        shell: bash
+        run: |
+          mkdir -p out
+          find . -path '*/release/bundle/*' \( -name '*.exe' -o -name '*.msi' \) 2>/dev/null | while read -r f; do cp "$f" out/ || true; done
+          ls -la out || true
+          echo "count=$(ls out 2>/dev/null | wc -l)" >> "$GITHUB_OUTPUT"
+
+      - name: Attach to prerelease
+        if: ${{ steps.collect.outputs.count != '0' }}
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: out/*
