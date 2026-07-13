@@ -36,9 +36,14 @@ jobs:
           ORIZ_FLEET_SENTRY_DSN_BROWSER_SDK: ${{ secrets.ORIZ_FLEET_SENTRY_DSN_BROWSER_SDK }}
           ORIZ_FLEET_CLOUDFLARE_WEB_ANALYTICS_TOKEN: ${{ secrets.ORIZ_FLEET_CLOUDFLARE_WEB_ANALYTICS_TOKEN }}
 
+      - name: Ensure Cloudflare Pages project
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm dlx wrangler@4 pages project create fleet-landing --production-branch=main || true
+
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/wrangler-action@v4
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=fleet-landing
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: pnpm dlx wrangler@4 pages deploy dist --project-name=fleet-landing --branch=main
